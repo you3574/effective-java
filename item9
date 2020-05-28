@@ -1,0 +1,82 @@
+
+아이템 9 . try-finally보다는 try-with-resources를 사용하라
+DB 연결이나 파일 입출력 같은 close()를 통해 닫아주어야하는 자원들이 있다. 이런 자원들은 Java 7 이전에는 try-finally을 통해서 close를 시켜주었다.
+문제점
+	자원이 2개 이상이 되어버리면 아래와 같이 코드가 복잡해지고, 가독성이 떨어지게된다.
+	try-catch-finally 구문을 통해 Exception이 발생하더라도, finally 절에서 close를 호출 하도록 했는데, finally 절 내에서 Exception이 발생하는 경우도 있기 때문에 이를 방지하기 위해 더 더러운 코드를 생산하는 일이 적지 않았다.
+	두번째 예외가 첫번째 예외를 완전히 집어삼켜, 스택 추적 내역에 첫 번째 예외에 관한 정보는 남지 않게 되어, 디버깅을 어렵게 한다. 
+
+public JDBCExam() {
+      try {
+          Class.forName(driverName);
+          connection = DriverManager.getConnection(url, user, password);
+      } catch (ClassNotFoundException e) {
+          System.out.println("[로드 오류]\n" + e.getStackTrace());
+      } catch (SQLException e) {
+          System.out.println("[연결 오류]\n" + e.getStackTrace());
+      } finally {
+          try {
+              if (connection != null) {
+                  connection.close();
+              }
+              if (statement != null) {
+                  statement.close();
+              }
+              if (resultSet != null) {
+                  resultSet.close();
+              }
+          } catch (SQLException e) {
+              System.out.println("[닫기 오류]\n" + e.getStackTrace());
+          }
+      }
+  }
+
+이러한 문제들은 자바7의 try-with-resources 덕에 모두 해결되었다. 이 구조를 사용하려면 AutoCloseable 인터페이스를 구현해야 한다. (닫아야 하는 자원을 뜻하는 클래스를 작성한다면 반드시 구현)
+try 절에 AutoCloseable을 구현한 클래스에 대한 인스턴스를 선언하게 되면 try절이 종료되는 시점에 AutoCloseable 인터페이스의 close() 메서드를 자동으로 호출 한다. 그렇기 때문에 이전처럼 finally 구문에서 별도로 자원에 대한 해제를 하지 않아도 된다.
+
+public class JDBCExam {
+
+    String driverName = "oracle.jdbc.driver.OracleDriver";
+    String url = "oracle:thin:localhost:1521:ORCL";
+    String user = "scott";
+    String password = "tiger";
+
+    public JDBCExam() {
+        try (Connection connection = DriverManager.getConnection(url, user, password);
+             Statement statement = connection.prepareStatement("select * from member");
+             ResultSet resultSet = statement.getResultSet();
+             ){
+            Class.forName(driverName);
+            String name = resultSet.getString(1);
+            System.out.println("회원명 : " + name);
+            
+        } catch (ClassNotFoundException e) {
+            System.out.println("[로드 오류]\n" + e.getStackTrace());
+        } catch (SQLException e) {
+            System.out.println("[연결 오류]\n" + e.getStackTrace());
+        } 
+    }
+}
+결론
+보통 try-finally에서처럼 try-with-resources에서도 catch 절을 쓸 수 있다.
+Catch절 덕분에 try문을 더 중첩하지 않고도 다수의 예외를 처리할 수 있다.
+꼭 회수해야하는 자원을 다룰 때는 try-finally 말고, try-with-resources를 사용
+코드는 더 짧고 분명해지고, 만들어지는 예외 정보도 훨씬 유용. 
+더 정확하고 쉽게 자원을 회수 가능.
+
+AutoCloseable 인터페이스
+public interface AutoCloseable {
+    void close() throws Exception;
+}
+
+인터페이스 추가와 함께 소소한 문법적 추가도 이뤄졌는데 try 절에 ()가 들어갈 수 있게됐다.
+public static void main(String[] args) {
+    try(FileInputStream fis = new FileInputStream("")){
+         
+    }catch(IOException e){
+
+    }
+}
+
+이런식으로 try(){} 형태로 사용이 가능하며 () 안에 들어올 수 있는건 AutoCloseable 구현체뿐이다. 이런 문법을 try with resources 라고 부른다. 저렇게하면 무슨 이점이 있을까? 매우 직관적인 인터페이스 명칭이나 위 예제를 보고 눈치챌수도있겠지만 try catch 절이 종료되면서 자동으로 close() 메서드를 호출해준다.
+
