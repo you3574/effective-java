@@ -1,0 +1,168 @@
+아이템 14.conparable을 구현할지 고려하라
+Comaparable을 구현하면 compareTo를 재정의 하여 손쉽게 컬렉션을 정렬할 수 있다.
+따라서 알파벳, 숫자, 연대와 같이 순서가 명확한 클래스를 작성한다면 반드시 Comparable을 구현하도록 하자.
+
+
+public interface Comparable<T> {
+	int compareTo(T t);
+}
+
+compareTo 메서드의 일반 규약
+•	첫 번째 규약,
+(x.compareTo(y) < 0) 이라면 (y.compareTo(x) > 0) 이다.
+따라서 x.compareTo(y)가 Exception을 발생시킨다면 y.compareTo(x) 또한 Exception을 발생시켜야 한다.
+•	두 번째 규약,
+x.compareTo(y) < 0 이고 y.compareTo(z) < 0 이라면 x.compareTo(z) < 0 이다.
+삼단 논법과 같다.
+•	세 번째 규약,
+크기가 같은 객체들끼리는 어떤 객체와 비교하더라도 항상 같아야한다.
+x.compareTo(y) == 0 으로 인해 동치가 두 객체의 크기가 같다면,
+x.compareTo(z) 와 y.compareTo(z) 는 같아야한다.
+•	별도로 equals 메서도와 일관되게 작성하는 것이 좋다.
+만약 일관되지 않게 구현을 했다면 그렇다는 것을 명시해 주도록 하자.
+정렬된 컬렉션의 경우 equals가 아닌 compareTo를 이용하여 정렬을 시도한다.
+
+this < object : -1
+this == object : 0
+this > object : 1
+
+compareTo 규약을 지키지 못하면 비교를 활용하는 클래스와 어울리지 못한다.
+
+구현
+1.	객체 참조 필드가 하나뿐인 비교자
+// 코드 14-1 객체 참조 필드가 하나뿐인 비교자 (90쪽)
+//
+public final class CaseInsensitiveString
+        implements Comparable<CaseInsensitiveString> {
+    private final String s;
+
+    public CaseInsensitiveString(String s) {
+        this.s = Objects.requireNonNull(s);
+    }
+
+    // 수정된 equals 메서드 (56쪽)
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof CaseInsensitiveString &&
+                ((CaseInsensitiveString) o).s.equalsIgnoreCase(s);
+    }
+
+    @Override
+    public int hashCode() {
+        return s.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return s;
+    }
+
+    // 자바가 제공하는 비교자를 사용해 클래스를 비교한다.
+    public int compareTo(CaseInsensitiveString cis) {
+        return String.CASE_INSENSITIVE_ORDER.compare(s, cis.s);
+    }
+
+    public static void main(String[] args) {
+        Set<CaseInsensitiveString> s = new TreeSet<>();
+
+        String[] args2 = {"B","A","D"};
+
+        for (String arg : args2)
+            s.add(new CaseInsensitiveString(arg));
+
+        System.out.println(s);
+    }
+}
+2.	기본 타입 필드가 여럿일 때의 비교자
+// 코드 14-2 기본 타입 필드가 여럿일 때의 비교자 (91쪽)
+    /*비교 결과가 0이 아니면 비교된 것. 0이면 하위순위 검토하여 비교하기*/
+public int compareTo(PhoneNumber pn) {
+        int result = Short.compare(areaCode, pn.areaCode); //가장 중요한 필드
+        if (result == 0)  { 
+            result = Short.compare(prefix, pn.prefix); //두 번째로 중요한 필드
+            if (result == 0)
+                result = Short.compare(lineNum, pn.lineNum); //세 번째로 중요한 필드
+        }
+        return result;
+    }
+3.	비교자 생성 메서드를 활용한 비교자 (두번째 방법을 보완한 방법.)
+// PhoneNumber를 비교할 수 있게 만든다. (91-92쪽)
+public final class PhoneNumber implements Cloneable, Comparable<PhoneNumber> {
+    private final short areaCode, prefix, lineNum;
+
+    public PhoneNumber(int areaCode, int prefix, int lineNum) {
+        this.areaCode = rangeCheck(areaCode, 999, "지역코드");
+        this.prefix = rangeCheck(prefix, 999, "프리픽스");
+        this.lineNum = rangeCheck(lineNum, 9999, "가입자 번호");
+    }
+
+    private static short rangeCheck(int val, int max, String arg) {
+        if (val < 0 || val > max)
+            throw new IllegalArgumentException(arg + ": " + val);
+        return (short) val;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this)
+            return true;
+        if (!(o instanceof PhoneNumber))
+            return false;
+        PhoneNumber pn = (PhoneNumber) o;
+        return pn.lineNum == lineNum && pn.prefix == prefix
+                && pn.areaCode == areaCode;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Short.hashCode(areaCode);
+        result = 31 * result + Short.hashCode(prefix);
+        result = 31 * result + Short.hashCode(lineNum);
+        return result;
+    }
+
+    /**
+     * 이 전화번호의 문자열 표현을 반환한다.
+     * 이 문자열은 "XXX-YYY-ZZZZ" 형태의 12글자로 구성된다.
+     * XXX는 지역 코드, YYY는 프리픽스, ZZZZ는 가입자 번호다.
+     * 각각의 대문자는 10진수 숫자 하나를 나타낸다.
+     * <p>
+     * 전화번호의 각 부분의 값이 너무 작아서 자릿수를 채울 수 없다면,
+     * 앞에서부터 0으로 채워나간다. 예컨대 가입자 번호가 123이라면
+     * 전화번호의 마지막 네 문자는 "0123"이 된다.
+     */
+    @Override
+    public String toString() {
+        return String.format("%03d-%03d-%04d",
+                areaCode, prefix, lineNum);
+    }
+
+    // 코드 14-3 비교자 생성 메서드를 활용한 비교자 (92쪽)
+/* 
+    private static final Comparator<PhoneNumber> COMPARATOR =
+            comparingInt((PhoneNumber pn) -> pn.areaCode) //지역코드
+                    .thenComparingInt(pn -> pn.prefix) //프리픽스
+                    .thenComparingInt(pn -> pn.lineNum); //가입자번호
+
+    public int compareTo(PhoneNumber pn) {
+        return COMPARATOR.compare(this, pn); //키 추출 함수를 인수로 받아, 그 키를 기준으로 순서를 정함. 
+    }
+
+    private static PhoneNumber randomPhoneNumber() {
+        Random rnd = ThreadLocalRandom.current();
+        return new PhoneNumber((short) rnd.nextInt(1000),
+                (short) rnd.nextInt(1000),
+                (short) rnd.nextInt(10000));
+    }
+
+    public static void main(String[] args) {
+        NavigableSet<PhoneNumber> s = new TreeSet<PhoneNumber>();
+        for (int i = 0; i < 10; i++)
+            s.add(randomPhoneNumber());
+        System.out.println(s);
+    }
+}
+
+정리
+순서를 고려해야 하는 값 클래스라면 꼭 Comparable 인터페이스를 구현해야 한다.
+기존에 구현된 컬렉션에서는 compareTo 메서드가 구현되어 있다고 생각하고 정렬, 검색, 비교 기능을 구현하고 있다.
