@@ -1,0 +1,239 @@
+아이템13. Clone 재정의는 주의해서 진행하라
+
+Clone 메소드란?
+“복제하는 메소드”
+즉, 여러 정보를 담고 있는 객체가 있는데, 그 객체의 “clone”메소드를 사용하면 같은 정보를 담고있는 또 다른 하나의 객체를 만들 수 있다.
+하지만! 모든 클래스가 복제할 수 있는 것은 아니다.
+Clone은 object메소드가 아닌 Cloneable인터페이스의 추상메소드이다.
+그래서, 복제할 수 있는 클래스는 Cloneable인터페이스가 구현된 클래스여야 가능!
+public interface Cloneable {
+}
+자바의 Cloneable인터페이스를 보면 아무런 메소드도 없다. 아무것도 없지만, 사실은 Object의 clone메소드의 동작방식을 결정한다.
+Cloneable을 구현한 클래스의 인스턴스에서 clone을 호출하면, 그 객체의 필드들을 하나하나 복사한 객체를 반환하며, 그렇지 않은 클래스의 인스턴스에서 호출하면, ClassNotSupportedException을 던진다.
+Clone 메소드 사용예제
+Calendar calendar = Calendar.getInstance();
+	calendar.clear();
+	calendar.set(1996,04,30);
+		
+		System.out.print("(calendar)나의 생일은:");
+		System.out.println(calendar.get(Calendar.YEAR)+ "년"+ 
+		calendar.get(Calendar.MONTH)+ "월"+ 
+		calendar.get(Calendar.DAY_OF_MONTH)+ "일");
+	
+	Calendar calendar2 = (Calendar)calendar.clone();
+		
+		System.out.print("(calendar2)나의 생일은:");
+		System.out.println(calendar2.get(Calendar.YEAR)+ "년"+ 
+		calendar2.get(Calendar.MONTH)+ "월"+ 
+		calendar2.get(Calendar.DAY_OF_MONTH)+ "일");
+
+(calendar)나의 생일은:1996년4월30일
+(calendar2)나의 생일은:1996년4월30일
+
+1번방법
+package item13;
+/*
+ * Cloneable 인터페이스 사용
+ */
+public class Student implements Cloneable {
+
+	private String Name;
+	
+	public Student(String _name) {
+		Name= _name;
+	}
+	
+	public String getName() {
+		return Name;
+	}
+	
+	
+	@Override
+	protected Object clone() throws CloneNotSupportedException{
+		return super.clone();
+	}
+	
+	
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+
+		Student student1= new Student("yoobin");
+		Student student2 =null;
+		
+		try {
+			student2 = (Student) student1.clone();
+		}catch(CloneNotSupportedException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("student1의 이름:"+ student1.getName());
+		System.out.println("student2의 이름:"+ student2.getName());
+		
+	}
+
+}
+
+2번방법
+package item13;
+/*
+ * Cloneable 인터페이스 사용
+ */
+public class Student implements Cloneable {
+
+	private String Name;
+	
+	public Student(String _name) {
+		Name= _name;
+	}
+	
+	public String getName() {
+		return Name;
+	}
+	
+	
+	@Override
+	public Student clone(){
+		try {
+			return (Student) super.clone();
+		}catch(CloneNotSupportedException e) {
+			throw new AssertionError();
+		}
+	}
+	
+	
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+
+		Student student1= new Student("yoobin");
+		Student student2 =null;
+		
+		
+		student2 = (Student) student1.clone();
+		
+		
+		System.out.println("student1의 이름:"+ student1.getName());
+		System.out.println("student2의 이름:"+ student2.getName());
+		
+	}
+
+}
+
+
+student1의 이름:yoobin
+student2의 이름:yoobin
+
+
+요점
+1.	clone메소드는 Cloneable인터페이스가 구현된 클래스만 사용이 가능하다.
+2.	clone메소드를 통해 객체의 복제가 가능하다.
+
+
+가변 상태를 갖는 필드에 대한 복제
+
+public class Stack implements Cloneable{
+	  private Object[] elements;
+	  private int size = 0;
+	  private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+	  public Stack() {
+	    this.elements = new Object[DEFAULT_INITIAL_CAPACITY];
+	  }
+
+	  public void push(Object o) {}
+	  }
+	  ...
+
+	  @Override
+	  public Stack clone() {
+	    try {
+	      Stack result = (Stack) super.clone();
+	      result.elements = 
+	    } catch(CloneNotSupportedException e) {
+	    }
+	  }
+	}
+
+가변객체는 원본과 복제본 둘 다 값이 같아야한다. -> 객체의 불변식을 보장해야한다.
+그렇기 때문에 제대로 복제하기 위해서는, elements라는 배열을 똑같이 복사해서 만들어 줘야한다. 
+단, elements필드가 final이면 작동하지 않는다. -> final필드에는 새로운 값을 할당할 수 없기 때문이다.
+
+
+복잡한 가변 상태를 갖는 필드에 대한 복제
+1.복잡한 가변 상태는 갖는 클래스용 재귀적 clone메서드
+
+public class HashTable implements Cloneable  {
+	  private Entry[] buckets = ...;
+	  private static class Entry {
+	    final Object key;
+	    Object value;
+	    Entry next;
+
+	    Entry(Object key, Object value, Entry next) {
+	      this.key = key;
+	      this.value = value;
+	      this.next = next;
+	    }
+
+	
+Entry deepcopy() {
+	     return new Entry(key,value,
+			next == null? null: next.deepCopy());
+}
+}
+
+/*
+ * 적절한 크기의 새로운 버킷 배열 할당.
+ * 원래의 버킷 배열을 순회하며 비지 않은 각 버킷에 대해 깊은 복사 수행.
+ * Entry의 deepCopy 메서도는 자신이 가리키는 연결리스트
+ * 전체를 복사하기 위해 자신을 재귀적으로 호출.
+ */
+	@Override
+public public HashTable clone() {
+  try {
+    HashTable result = (HashTable) super.clone();
+    result.buckets = new Entry[buckets.length];
+    for(int i=0; i<buckets.length; i++) {
+    	if(buckets[i]!=null) {
+    		result.buckets[i]=buckets[i].deepCopy(); 
+    	}
+    	return result;
+    }catch (CloneNotSupportedException e) {
+    	throw new AssertionError();
+    }
+    
+}
+}
+이 기법은 간단하며, 버킷이 너무 길지 않다면 잘 작동한다. 하지만 연결 리스트를 복제하는 방법으로는 그다지 좋지 않다. 재귀호출 때문에 리스트의 원소 수만큼 스택 프레임을 소비하여, 리스트가 길면 stack overflow를 일으킬 위험이 있기 때문이다.
+
+2.Stack overflow해결
+
+
+Entry deepCopy() {
+	Entry result =new Entry(key, value, next);
+	for(Entry p=result; p.next !=null; p=p.next)
+		p.next=new Entry(p.next.key, p.next.value, p.next.next);
+	return result;
+}
+
+deepCopy를 재귀 호출 대신 반복자를 써서 순회해야한다.
+
+
+
+
+Clone을 대신할 수 있는 복사생성자와 복사 팩터리메서드
+
+public Yum(Yum yum) {}
+
+public static Yum newInstance(Yum yum) {}
+
+•	언어 모순적이고 위험한 객체 생성 메커니즘을 사용하지 않는다. (super.clone())
+•	clone 규약에 기대지 않는다.
+•	정상적인 final필드 용법과도 충돌하지 않는다.
+•	불필요한 check exception 처리가 필요없다.
+•	형변환도 필요없다.
+•	복사 생성자와 복사 팩터리는 인터페이스 타입의 인스턴스를 인수로 받을 수 있다.
+
+아아템 14.conparable을 구현할지 고려하라
+Comaparable을 구현하면 compareTo를 재정의 하여 손쉽게 컬렉션을 정렬할 수 있다.
+따라서 알파벳, 숫자, 연대와 같이 순서가 명확한 클래스를 작성한다면 반드시 Comparable을 구현하도록 하자.
+
