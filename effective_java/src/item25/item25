@@ -1,0 +1,81 @@
+아이템25. 톱레벨 클래스는 한 파일에 하나만 담으라
+소스파일 하나에 톱레벨 클래스를 여러 개 선언하더라도 자바 컴파일러는 불평하지 않는다. 하지만 심각한 위험을 감수해야한다.
+한 클래스를 여러 가지로 정의할 수 있어, 그 중 어느 것을 사용할지는 어느 소스 파일을 먼저 컴파일하냐에 따라 달라진다.
+
+  
+•	위와 같이 이름이 중복되는 경우 컴파일 에러가 발생하게된다.
+•	컴파일러에 어느 소스파일을 먼저 건네느냐에 따라 동작이 달라지므로 반드시 바로잡아야한다.
+
+Main클래스는 다른 톱레벨 클래스 두개(Utensil.과 Dessert)를 참조
+public class Main {
+    public static void main(String[] args){
+        System.out.println(Utensil.NAME + Dessert.NAME);
+    }
+}
+두 클래스를 한 파일 (Utensil.class)에 정의
+[Utensil.java]
+class Utensil {
+    static final String NAME = "pan";
+}
+class Dessert {
+    static final String NAME = "cake";
+}
+	Main을 실행하면 pancake출력
+
+우연히 똑 같은 클래스를 담은 Dessert.class를 정의
+[Dessert.java]
+class Utensil {
+    static final String NAME = "pot";
+}
+class Dessert {
+    static final String NAME = "pie";
+}
+
+결과
+1.	컴파일 오류 발생 후 두 클래스가 중복정의되었다고 알려줄 것이다.
+2.	컴파일러는 Main.java를 컴파일 하고, 그 안에서 (Dessert 참조보다 먼저 나오는) Utensil 참조를 만나면 Utensil.java 파일을 살펴 Utensil과 Dessert 를 모두 찾아낼 것이다.
+3.	그런다음, 두번째 명령줄 인수로 넘어온 Dessert.java 를 처리하려 할때 같은 클래스의 정의가 이미 있음을 알게 된다.
+4.	javac Main.java 나 javac Main.java Utensil.java 명령으로 컴파일 한다면?
+	Dessert.java 파일을 작성하기 전처럼 pancake을 출력한다.
+
+5.	javac Dessert.java Main.java 명령으로 컴파일 한다면?
+	potpie를 출력한다.
+해결책
+단순히 톱레벨 클래스들(Utensil과 Dessert)을 서로 다른 소스 파일로 분리하면 해결된다.
+굳이 한 파일에 여러 톱레벨 클래스를 담고 싶다면 정적 멤버 클래스(Item 24)를 사용하는 방법도 있다. 
+정적 멤버 클래스를 사용하면 읽기 좋고, 접근 범위도 최소로 관리하기 때문에 좋다.
+public class Test {
+    public static void main(String[] args){
+        System.out.println(Utensil.NAME + Dessert.NAME);
+    }
+    private static class Utensil {
+        static final String NAME = "pen";
+    }
+    private static class Dessert {
+        static final String NAME = "cake";
+    }
+}
+
+5장 제네릭
+제네릭(Generic)은 클래스 내부에서 사용할 데이터 타입을 외부에서 지정하는 기법을 의미한다. 말이 어렵다.  
+ 
+ 
+package org.opentutorials.javatutorials.generic;
+ 
+class Person<T>{
+    public T info;
+}
+ 
+public class GenericDemo {
+ 
+    public static void main(String[] args) {
+        Person<String> p1 = new Person<String>();
+        Person<StringBuilder> p2 = new Person<StringBuilder>();
+    }
+}
+ 
+p1.info : String
+p2.info : StringBuilder
+
+제네릭을 사용하면 컬렉션이 담을 수 있는 타입을 컴파일러에 알려주게 되어 컴파일러는 알아서 형변환 코드를 추가, 엉뚱한 타입의 객게를 넣으려는 시도를 차단하고 안전하고 명확한 프로그램을 만들어준다.
+
