@@ -1,0 +1,135 @@
+아이템38. 확장할 수 있는 열거 타입이 필요하면 인터페이스를 사용하라
+타입 안전 열거 패턴은 확장할 수 있으나 열거타입은 그럴 수 없다.
+이따금 API가 제공하는 기본 연산 외에 사용자 확장 연산을 추가할 수 있도록 열어줘야 할 때는 임의의 인터페이스를 구현하여 해결한다.
+
+예제
+package item38;
+
+//코드 38-1 인터페이스를 이용해 확장 가능 열거 타입을 흉내 냈다. (232쪽)
+public interface Operation {
+ double apply(double x, double y);
+}
+//코드 38-1 인터페이스를 이용해 확장 가능 열거 타입을 흉내 냈다. - 기본 구현 (233쪽)
+public enum BasicOperation implements Operation {
+ PLUS("+") {
+     @Override
+     public double apply(double x, double y) {
+         return x + y;
+     }
+ },
+ MINUS("-") {
+     @Override
+     public double apply(double x, double y) {
+         return x - y;
+     }
+ },
+ TIMES("*") {
+     @Override
+     public double apply(double x, double y) {
+         return x * y;
+     }
+ },
+ DIVIDE("/") {
+     @Override
+     public double apply(double x, double y) {
+         return x / y;
+     }
+ };
+
+ private final String symbol;
+
+ BasicOperation(String symbol) {
+     this.symbol = symbol;
+ }
+
+ @Override
+ public String toString() {
+     return symbol;
+ }
+}
+
+열거타입인 BasicOperation은 확장할 수 없지만 인터페이스인 Operation은 확장할 수 있고, 이 인터페이스를 연산의 타입으로 사용하면 된다.
+이렇게 하면 Operation을 구현한 또 다른 열거 타입을 정의해 기본 타입인 BasicOperation을 대체할 수 있다.
+
+
+package item38;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+// 코드 38-2 확장 가능 열거 타입 (233-235쪽)
+public enum ExtendedOperation implements Operation {
+    EXP("^") {
+        @Override
+        public double apply(double x, double y) {
+            return Math.pow(x, y);
+        }
+    },
+    REMAINDER("%") {
+        @Override
+        public double apply(double x, double y) {
+            return x % y;
+        }
+    };
+    private final String symbol;
+
+    ExtendedOperation(String symbol) {
+        this.symbol = symbol;
+    }
+
+    @Override
+    public String toString() {
+        return symbol;
+    }
+
+}
+이렇게 확장하면 기존 연산에 쓰던 곳에서 계속 확장된 것도 사용할 수 있다.
+
+package item38;
+public class Test {
+    
+    // 열거 타입의 Class 객체를 이용해 확장된 열거 타입의 모든 원소를 사용하는 예 (234쪽)
+    public static void main(String[] args) {
+        double x = 2;
+        double y = 4;
+        test(ExtendedOperation.class, x, y);
+    }
+    //test메서드에 ExtendedOperation의 class리터럴을 넘겨 확장된 연산들이 무엇인지 알려준다. Class 객체가 열거 타입인 동시에 Operation의 하위타입이어야 한다는 뜻. 열거 타입이어야 원소를 순회할 수 있고, Operation이어야 원소가 뜻하는 연산을 수행할 수 있다.
+    private static <T extends Enum<T> & Operation> void test(
+            Class<T> opEnumType, double x, double y) {
+        for (Operation op : opEnumType.getEnumConstants())
+            System.out.printf("%f %s %f = %f%n",
+                    x, op, y, op.apply(x, y));
+    }
+
+}
+2.000000 ^ 4.000000 = 16.000000
+2.000000 % 4.000000 = 2.000000
+
+
+
+package item38;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+public class Test2 {
+
+    // 컬렉션 인스턴스를 이용해 확장된 열거 타입의 모든 원소를 사용하는 예 (235쪽)
+    public static void main(String[] args) {
+        double x = 2;
+        double y = 4;
+        test2(Arrays.asList(ExtendedOperation.values()), x, y);
+    }
+	
+    // Class 객체 대신 한정적 와일드 카드 타입인 Collection<? extends Operation>을 넘기는 방법. 덜 복합하고, 여러 구현 타입의 연산을 조합해 호출할 수 있게 되었다. 반명, 특정 연산에서는 EnumSet과 EnumMap을 사용하지 못한다.
+    private static void test2(Collection<? extends Operation> opSet,
+                             double x, double y) {
+        for (Operation op : opSet)
+            System.out.printf("%f %s %f = %f%n",
+                    x, op, y, op.apply(x, y));
+    }
+}
+
+결론
+열거 타입 자체는 확장할 수 없지만, 인터페이스와 그 인터페이스를 구현하는 기본 열거타입을 함께 사용해 같은 효과를 낼 수 있다.
